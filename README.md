@@ -1,6 +1,8 @@
 # Kaitlyn-Rachel-Project-2-PHY607
 Project 2 for computational physics.
 
+Google Document Link : https://docs.google.com/document/d/1esJPXpL7wk_rFlP4xGjeU7D_FtuhsbtHlX0q958LbfY/edit?tab=t.0
+
 We plan to do planetesimal accretion as our topic for project 2. 
 
 Planetesimals are solid objects thought to exist in protoplanetary disks and debris disks.
