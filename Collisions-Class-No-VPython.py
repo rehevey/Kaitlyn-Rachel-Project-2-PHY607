@@ -43,6 +43,8 @@ class CollisionModel:
         self.merges = 0
         self.bounces = 0
 
+        self.collision_log = []                 # one (t, v_rel/v_esc, merged?) per collision
+
     # ---------- ODE system ----------
     @staticmethod       #doesn't need access to the instance, doesnn't need self 
     def unpack(y, n):
@@ -91,10 +93,13 @@ class CollisionModel:
 
     # ---------- collision helpers ----------
 
-    def merge_probability(self, a, b):
+    def vrel_over_vesc(self, a, b):
         v_rel = np.linalg.norm(self.vel[b] - self.vel[a])
         v_esc = np.sqrt(2*G*(self.m[a] + self.m[b]) / (self.radius[a] + self.radius[b]))
-        return 1.0 / (1.0 + (v_rel/v_esc)**2)
+        return v_rel / v_esc
+
+    def merge_probability(self, a, b):
+        return 1.0 / (1.0 + self.vrel_over_vesc(a, b)**2)
 
     def do_merge(self, a, b):
         m, pos, vel = self.m, self.pos, self.vel
@@ -146,7 +151,10 @@ class CollisionModel:
                 return
             a, b = pair
             self.collisions += 1
-            if self.rng.random() < self.merge_probability(a, b):
+            ratio = self.vrel_over_vesc(a, b)            # measure BEFORE merge/bounce changes velocities
+            merged = self.rng.random() < 1.0 / (1.0 + ratio**2)
+            self.collision_log.append((self.t, ratio, merged))
+            if merged:
                 self.do_merge(a, b)
                 self.merges += 1
             else:
@@ -220,12 +228,50 @@ def run_headless(model, t_end, frame_dt):
             print(model.summary())
             next_report += 5.0
  
+def histogram_counts(model, bins):
+    #Return (merge_counts, bounce_counts) for the logged v_rel/v_esc values. Out-of-range values land in the end bins.
+    if not model.collision_log:
+        z = np.zeros(len(bins) - 1)
+        return z, z.copy()
+    ratio = np.array([c[1] for c in model.collision_log])
+    merged = np.array([c[2] for c in model.collision_log], dtype=bool)
+    ratio = np.clip(ratio, bins[0], bins[-1] * (1 - 1e-12))   # out-of-range values go in the end bins
+    return (np.histogram(ratio[merged], bins=bins)[0],
+            np.histogram(ratio[~merged], bins=bins)[0])
  
-def run_animation(model, t_end, frame_dt, view_range=1.8, save_path=None, steps_per_frame=1):
+ 
+def style_hist_axis(ax, xmin, xmax):
+    ax.set_facecolor("black")
+    for sp in ax.spines.values():
+        sp.set_color("white")
+    ax.tick_params(colors="white")
+    ax.set_xscale("log")
+    ax.set_xlim(xmin, xmax)
+    ax.set_xlabel(r"$v_{rel}/v_{esc}$ at collision", color="white")
+    ax.set_ylabel("collisions", color="white")
+    ax.set_title("Collision speeds", color="white")
+ 
+ 
+def plot_histogram(model, xmin=0.1, xmax=100.0, nbins=40):
+    #Static histogram of the finished run (use after headless mode).
+    import matplotlib.pyplot as plt
+    bins = np.logspace(np.log10(xmin), np.log10(xmax), nbins + 1)
+    mc, bc = histogram_counts(model, bins)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    fig.patch.set_facecolor("black")
+    w = np.diff(bins)
+    ax.bar(bins[:-1], mc, width=w, align="edge", color="limegreen", label="merge")
+    ax.bar(bins[:-1], bc, width=w, align="edge", bottom=mc, color="tomato", label="bounce")
+    style_hist_axis(ax, xmin, xmax)
+    ax.legend(facecolor="black", labelcolor="white")
+    plt.show()
+
+ 
+def run_animation(model, t_end, frame_dt, view_range=1.8, save_path=None, steps_per_frame=1,hist_xmin=0.1, hist_xmax=100.0, hist_bins=40):
     import matplotlib.pyplot as plt
     from matplotlib.animation import FuncAnimation
  
-    fig, ax = plt.subplots(figsize=(8, 8))
+    fig, (ax, axh) = plt.subplots(1, 2, figsize=(13, 6), gridspec_kw={"width_ratios": [3, 2]})
     fig.patch.set_facecolor("black")
     ax.set_facecolor("black")
     ax.set_xlim(-view_range, view_range)
@@ -237,6 +283,15 @@ def run_animation(model, t_end, frame_dt, view_range=1.8, save_path=None, steps_
     ax.scatter([0], [0], s=150, color="yellow", zorder=3)          # the Sun
     bodies = ax.scatter([], [], color="deepskyblue", zorder=2)
     stats = ax.text(0.02, 0.97, "", transform=ax.transAxes, color="white", va="top", fontsize=9)
+
+    # histogram panel: merges (green) with bounces (red) stacked on top
+    bins = np.logspace(np.log10(hist_xmin), np.log10(hist_xmax), hist_bins + 1)
+    w = np.diff(bins)
+    zeros = np.zeros(hist_bins)
+    merge_bars = axh.bar(bins[:-1], zeros, width=w, align="edge", color="limegreen", label="merge")
+    bounce_bars = axh.bar(bins[:-1], zeros, width=w, align="edge", bottom=zeros, color="tomato", label="bounce")
+    style_hist_axis(axh, hist_xmin, hist_xmax)
+    axh.legend(facecolor="black", labelcolor="white", loc="upper right")
  
     def marker_sizes(radii):
         # convert physical radius (AU) -> scatter area (points^2) so sizes track real size
@@ -245,11 +300,17 @@ def run_animation(model, t_end, frame_dt, view_range=1.8, save_path=None, steps_
         pts_per_au = width_pts / (2 * view_range)
         diam_pts = 2 * radii * pts_per_au
         return np.maximum(diam_pts, 2.0) ** 2
- 
-    def frames():
-        while model.t < t_end:
-            yield model.t
- 
+
+    def update_hist():
+        mc, bc = histogram_counts(model, bins)
+        for bar, h in zip(merge_bars, mc):
+            bar.set_height(h)
+        for bar, h, base in zip(bounce_bars, bc, mc):
+            bar.set_height(h)
+            bar.set_y(base)
+        axh.set_ylim(0, max(5, (mc + bc).max() * 1.1))
+
+
     def update(_):
         for _ in range(steps_per_frame):
             model.advance(frame_dt)
@@ -257,17 +318,21 @@ def run_animation(model, t_end, frame_dt, view_range=1.8, save_path=None, steps_
         bodies.set_offsets(model.pos[a][:, [0, 2]])               # x vs z = orbital plane
         bodies.set_sizes(marker_sizes(model.radius[a]))
         stats.set_text(model.summary())
+        update_hist()
         return bodies, stats
+
+    def frames():
+        while model.t < t_end:
+            yield model.t
  
-    anim = FuncAnimation(fig, update, frames=frames, interval=16, blit=False,
-                         cache_frame_data=False, repeat=False)
- 
-    if save_path:                                                  # e.g. "sim.mp4" (needs ffmpeg) or "sim.gif"
+    fig.tight_layout()
+    if save_path:
         n_frames = int(np.ceil(t_end / (frame_dt * steps_per_frame)))
         anim = FuncAnimation(fig, update, frames=n_frames, blit=False, repeat=False)
         anim.save(save_path, fps=30, dpi=100)
         print(f"Saved {save_path}")
     else:
+        anim = FuncAnimation(fig, update, frames=frames, interval=16, blit=False,cache_frame_data=False, repeat=False)
         plt.show()
     return anim
  
@@ -290,6 +355,7 @@ def main():
     # ---------- run ----------
     if MODE == "headless":
         run_headless(model, t_end, frame_dt)
+        plot_histogram(model)
     else:
         run_animation(model, t_end, frame_dt, save_path=SAVE_PATH)
  
@@ -302,4 +368,3 @@ def main():
  
 if __name__ == "__main__":
     main()
-
