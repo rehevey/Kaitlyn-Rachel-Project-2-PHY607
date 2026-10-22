@@ -1,0 +1,12 @@
+Howdy,
+
+For the best results and most options look at the file named "Collision-Class-Benchmrak.py", this code is the full python class for collisions in Black formatting including the ability to run a benchmark test though the timeit library. 
+
+Scroll down to the function named "main", at the top of this function there are a bunch of parameters set up. These parameters control how and what the program runs. In the first block you have things like the number of bodies, how long the simulation runs (t_end), and the sampling resolution (frame_dt). This is great for collecting the 3 results for the report and doing some of our validations. Bellow this block is a second block of parameters, this is where you go to control what within the control is running. In here you can turn on and off the validation section and control which graphs pop-up. The most important line in this section is 1242, the mode variable, there are 4 options as described in the comment. 
+  
+Animate shows the whole system in a moving matplot.lib graph (see the bodies circling the sun and the merge vs bounce histogram forming).
+
+Headless just runs the "math" of the program you will get a stationary histogram and a print out in the terminal of the conditions at each time step followed by the standard graphs and data print out (tends to run faster).
+
+Check_integrator runs a shorted time frame (20 instead of 100) with the body radius set very low so collisions do not occur and only prints off the conditions at every time step, validation values, and the validation graphs (no histogram or largest mass tracking. This is a great mode for checking how much integration error there is, since each collision also messes with the preservation of energy and angular momentum.
+                                                                                                                                                  Benchmark runs the per-call cost of the program, allowing you to identify where the program is spending most of it's time. (In this case most of the time is being spent in rhs which makes sense from the temporary (n,n,3) and **1.5)
