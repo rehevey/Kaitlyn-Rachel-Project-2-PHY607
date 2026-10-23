@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "planetesimal-sim"
+version = "0.1.0"
+description = "N-body planetesimal accretion simulation with Monte Carlo initial conditions"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.22",
+    "scipy>=1.7",
+    "matplotlib>=3.5",
+]
+
+[project.scripts]
+planetesimal-sim = "planetesimal.simulation:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

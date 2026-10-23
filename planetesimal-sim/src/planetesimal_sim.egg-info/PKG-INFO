@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: planetesimal-sim
+Version: 0.1.0
+Summary: N-body planetesimal accretion simulation with Monte Carlo initial conditions
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.22
+Requires-Dist: scipy>=1.7
+Requires-Dist: matplotlib>=3.5
+
+# planetesimal-sim
+
+N-body planetesimal accretion simulation with Monte Carlo initial conditions.
+
+Install with `pip install .`, then run `planetesimal-sim`.

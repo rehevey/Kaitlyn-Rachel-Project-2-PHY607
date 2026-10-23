@@ -1,0 +1,2 @@
+[console_scripts]
+planetesimal-sim = planetesimal.simulation:main
