@@ -1,6 +1,8 @@
 # Kaitlyn-Rachel-Project-2-PHY607
 Project 2 for computational physics.
 
+planetesimal-sim is the name of the package it should be available in the main branch of the repository, the program uses numpy, scipy, and matplotlib these should be installed along with the package.
+
 Google Document Link : https://docs.google.com/document/d/1esJPXpL7wk_rFlP4xGjeU7D_FtuhsbtHlX0q958LbfY/edit?tab=t.0
 
 Good Sheet Link (Task Breakdown) : https://docs.google.com/spreadsheets/d/18b4x5p7Mw3Bich-5k94Cg8HaQymjLWOoNwduGfSQVJ8/edit?usp=sharing
